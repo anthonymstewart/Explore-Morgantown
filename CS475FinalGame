@@ -1,0 +1,174 @@
+import pygame, sys, random
+
+pygame.init()
+
+FPS = 120
+clock = pygame.time.Clock()
+
+BLACK = (0, 0, 0)
+GOLD = (255, 204, 0)
+BLUE = (0, 89, 122)
+WHITE = (255, 255, 255)
+RED = (225, 0, 0)
+
+#Dimensions for all the squares used for both Tile and Square
+GRIDWID = 35
+GRIDHEI = 35
+
+#480x320 for the 3.5" screen
+xdim = 480
+ydim = 320
+
+offset = 18
+
+#Global for determining if we're dragging something
+global held
+held = False
+
+DISPLAYSURF = pygame.display.set_mode((xdim, ydim))
+
+font = pygame.font.SysFont("Ariel", 20)
+
+#Class for the road tiles
+class Tile(pygame.sprite.Sprite):
+    def __init__(self, xcord, ycord):
+        super().__init__()
+
+        #Tile type will be determined by a 4-bit binary value
+        
+        #Straights:
+        #N-S - '1010' = 10
+        #W-E - '0101' = 5
+        
+        #Curves
+        #N-E - '1100' = 12
+        #E-S - '0110' = 6
+        #S-W - '0011' = 3
+        #W-N - '1001' = 9
+        
+        #3-ways
+        #N-E-S - '1110' = 14
+        #E-S-W - '0111' = 7
+        #S-W-N - '1011' = 11
+        #W-N-E - '1101' = 13
+
+        #4-way
+        #N-E-S-W - '1111' = 15
+
+        #This is likely determined by the code system - for now it's random - likely need a method to update the image using switch statements later on
+        self.ways = random.randint(1, 15)
+
+        #Use these lines to process the files, once they're converted to a proper format
+        #self.image = pygame.image.load("straight_tiles.psd").convert_alpha()
+        #self.image = pygame.transform.scale(self.image, (GRIDWID - 2, GRIDHEI - 2))
+        self.image = pygame.Surface([GRIDWID - 3, GRIDHEI - 3])
+        self.image.fill(RED)
+
+        pygame.draw.rect(self.image, RED, [xcord, ycord, GRIDWID - 3, GRIDHEI - 3])
+        self.rect = self.image.get_rect()
+        self.rect.x = xcord
+        self.rect.y = ycord
+
+#Class for the tiles the roads are placed on
+class Square(pygame.sprite.Sprite):
+    def __init__(self, row, col):
+        super().__init__()
+        self.occupied = False
+        self.blocked = False
+        self.row = row
+        self.column = column
+
+        self.image = pygame.Surface([GRIDWID, GRIDHEI])
+        self.image.fill(BLUE)
+
+        pygame.draw.rect(self.image, BLUE, [140 + (GRIDWID * row), 70 + (GRIDHEI * col), GRIDWID, GRIDHEI])
+        self.rect = self.image.get_rect()
+        self.rect.x = 140 + (GRIDWID * row)
+        self.rect.y = 70 + (GRIDHEI * col)
+
+#Creating our grid - This can be re-done in the loop later on if truely desired
+playgrid = pygame.sprite.Group()
+for row in range(5):
+    for column in range(5):
+        playgrid.add(Square(row, column))
+
+#Creating a group for the tiles, and some tiles (Placeholders for now)
+tiles = pygame.sprite.Group()
+first = Tile(415, 45)
+second = Tile(415, 110)
+third = Tile(415, 175)
+fourth = Tile(415, 240)
+tiles.add(first)
+tiles.add(second)
+tiles.add(third)
+tiles.add(fourth)
+
+#Global that determines the tile that's being dragged
+global selected
+selected = None
+
+#Game loop
+while True:
+    #Drawing the generic play area
+    DISPLAYSURF.fill(BLUE)
+
+    pygame.draw.rect(DISPLAYSURF, GOLD, [380, 0, 380, 320])
+    pygame.draw.line(DISPLAYSURF, WHITE, [380, 0], [380, 320], 2)
+
+    #Event triggers, including exiting and handling tiles snapping into place
+    for event in pygame.event.get():
+        #Quit the program
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+        #Starting to drag an object
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            held = True
+        #Ceasing to drag an object
+        if event.type == pygame.MOUSEBUTTONUP:
+            held = False
+            #Snap-to, based off the centers of the tiles
+            if selected is not None:
+                for spot in playgrid:
+                    #Checking that the tile and the appropriate grid tile are on tpo of one another, and that the grid spot is not occupied by another tile or an obstacle
+                    if selected.rect.collidepoint(spot.rect.x + (GRIDWID / 2), spot.rect.y + (GRIDHEI / 2)) and (not spot.occupied) and (not spot.blocked):
+                        selected.rect.x = spot.rect.x + 2
+                        selected.rect.y = spot.rect.y + 2
+                        spot.occupied = True
+            #With the mouse button released, selected is freed up for future dragging
+                selected = None
+                
+    #Allows the selected tile to continue to move
+    if held:
+        (clickx, clicky) = pygame.mouse.get_pos()
+        #Ensures that only one tile is ever moved around at once - This establishes selected
+        if selected is None:
+            for piece in tiles:
+                #Ensuring that the tile the player is hovering over is selected
+                if piece.rect.collidepoint(clickx, clicky):
+                    selected = piece
+                    piece.rect.x = clickx - offset
+                    piece.rect.y = clicky - offset
+                    for spot in playgrid:
+                        #Frees up the occupied tile that the block was on top of
+                        if selected.rect.collidepoint(spot.rect.x + (GRIDWID / 2), spot.rect.y + (GRIDHEI / 2)):
+                            spot.occupied = False
+                    break
+        else:
+        #If selected was found earlier, we skip the process and just move the selected tile
+            if selected.rect.collidepoint(clickx, clicky):
+                selected.rect.x = clickx - offset
+                selected.rect.y = clicky - offset
+
+    #Drawing all of the grid stuff
+    playgrid.draw(DISPLAYSURF)
+
+    for row in range(5):
+        for column in range(5): 
+            pygame.draw.rect(DISPLAYSURF, WHITE, [140 + (GRIDWID * row), 70 + (GRIDHEI * column), GRIDWID, GRIDHEI], 2)
+
+    #Drawing the tiles (Important, as they need to be on top of the grid)
+    tiles.draw(DISPLAYSURF)
+    pygame.display.update()
+    clock.tick(FPS)
+
