@@ -1,4 +1,5 @@
-import pygame, sys, random
+mport pygame, sys
+from random import *
 
 pygame.init()
 
@@ -56,15 +57,14 @@ class Tile(pygame.sprite.Sprite):
         #N-E-S-W - '1111' = 15
 
         #This is likely determined by the code system - for now it's random - likely need a method to update the image using switch statements later on
-        self.ways = random.randint(1, 15)
+        validCodes = [3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15]
+        self.ways = sample(validCodes, 1)
 
         #Use these lines to process the files, once they're converted to a proper format
-        #self.image = pygame.image.load("straight_tiles.psd").convert_alpha()
-        #self.image = pygame.transform.scale(self.image, (GRIDWID - 2, GRIDHEI - 2))
-        self.image = pygame.Surface([GRIDWID - 3, GRIDHEI - 3])
-        self.image.fill(RED)
+        self.image = tileType(self.ways[0])
+        self.image = pygame.transform.scale(self.image, (GRIDWID - 2, GRIDHEI - 2))
 
-        pygame.draw.rect(self.image, RED, [xcord, ycord, GRIDWID - 3, GRIDHEI - 3])
+        pygame.draw.rect(self.image, RED, [xcord, ycord, GRIDWID - 2, GRIDHEI - 2])
         self.rect = self.image.get_rect()
         self.rect.x = xcord
         self.rect.y = ycord
@@ -85,6 +85,23 @@ class Square(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = 140 + (GRIDWID * row)
         self.rect.y = 70 + (GRIDHEI * col)
+        
+#Determines the image of the tile used, based on the code system detailed in the Tile class
+def tileType(code):    
+    return {
+        3: pygame.transform.rotate(pygame.image.load("left_turn_tile.jpg"), 270),
+        5: pygame.image.load("straight_tiles.jpg"),
+        6: pygame.image.load("left_turn_tile.jpg"),
+        7: pygame.image.load("t_intersection_tile.jpg"),
+        9: pygame.transform.rotate(pygame.image.load("left_turn_tile.jpg"), 180),
+        10: pygame.transform.rotate(pygame.image.load("straight_tiles.jpg"), 90),
+        11: pygame.transform.rotate(pygame.image.load("t_intersection_tile.jpg"), 270),
+        12: pygame.transform.rotate(pygame.image.load("left_turn_tile.jpg"), 90),
+        13: pygame.transform.rotate(pygame.image.load("t_intersection_tile.jpg"), 180),
+        14: pygame.transform.rotate(pygame.image.load("t_intersection_tile.jpg"), 90),
+        15: pygame.image.load("intersection_tiles.jpg"),
+    }[code]
+    
 
 #Creating our grid - This can be re-done in the loop later on if truely desired
 playgrid = pygame.sprite.Group()
@@ -171,4 +188,3 @@ while True:
     tiles.draw(DISPLAYSURF)
     pygame.display.update()
     clock.tick(FPS)
-
