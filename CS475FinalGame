@@ -1,4 +1,4 @@
-mport pygame, sys
+import pygame, sys
 from random import *
 
 pygame.init()
@@ -11,6 +11,9 @@ GOLD = (255, 204, 0)
 BLUE = (0, 89, 122)
 WHITE = (255, 255, 255)
 RED = (225, 0, 0)
+
+global gridlength
+gridlength = 5
 
 #Dimensions for all the squares used for both Tile and Square
 GRIDWID = 35
@@ -26,6 +29,9 @@ offset = 18
 global held
 held = False
 
+global completion
+completion = False
+
 DISPLAYSURF = pygame.display.set_mode((xdim, ydim))
 
 font = pygame.font.SysFont("Ariel", 20)
@@ -34,6 +40,7 @@ font = pygame.font.SysFont("Ariel", 20)
 class Tile(pygame.sprite.Sprite):
     def __init__(self, xcord, ycord):
         super().__init__()
+        self.visited = False
 
         #Tile type will be determined by a 4-bit binary value
         
@@ -57,7 +64,7 @@ class Tile(pygame.sprite.Sprite):
         #N-E-S-W - '1111' = 15
 
         #This is likely determined by the code system - for now it's random - likely need a method to update the image using switch statements later on
-        validCodes = [3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15]
+        validCodes = [3, 3, 3, 5, 5, 5, 6, 7, 9, 10, 10, 11, 12, 12, 13, 14, 15]
         self.ways = sample(validCodes, 1)
 
         #Use these lines to process the files, once they're converted to a proper format
@@ -77,9 +84,19 @@ class Square(pygame.sprite.Sprite):
         self.blocked = False
         self.row = row
         self.column = column
+        self.toptile = None
 
-        self.image = pygame.Surface([GRIDWID, GRIDHEI])
-        self.image.fill(BLUE)
+        if row == 0 and col == 0:
+            self.image = pygame.image.load("begin.jpg")
+            self.image = pygame.transform.scale(self.image, (GRIDWID - 2, GRIDHEI - 2))
+            self.blocked = True
+        elif row == gridlength - 1 and col == gridlength - 1:
+            self.image = pygame.image.load("end.jpg")
+            self.image = pygame.transform.scale(self.image, (GRIDWID - 2, GRIDHEI - 2))
+            self.blocked = True
+        else:
+            self.image = pygame.Surface([GRIDWID, GRIDHEI])
+            self.image.fill(BLUE)
 
         pygame.draw.rect(self.image, BLUE, [140 + (GRIDWID * row), 70 + (GRIDHEI * col), GRIDWID, GRIDHEI])
         self.rect = self.image.get_rect()
@@ -101,32 +118,108 @@ def tileType(code):
         14: pygame.transform.rotate(pygame.image.load("t_intersection_tile.jpg"), 90),
         15: pygame.image.load("intersection_tiles.jpg"),
     }[code]
+
+#MO for path finding:
+#Mark the tile as visited - we don't want to backtrack - Done
+#Given a tile, see if it can go north, east, south, or west - Done
+#If it can go that way (And doesn't go off the edge), attempt to get the tile in question
+#Check the tile first - is it properly connected to the previous tile (Can go south, west, north, east, respectively)? Has it already been visited?
+#If it passes all tests, run pathFinder using this new tile and its coordinates on the grid
+#If we are able to reach the goal grid, return True to signal success
+#If the path cannot go any further, return False to signal failure - Done
+
+def pathFinder(tile, row, column):
+    tile.visited = True
+    #print("At (" + str(row) + ", " + str(column) + ")")
+
+    #Can go east?
+    if tile.ways[0] & 0b0100 != 0 and row + 1 < gridlength:
+        #Testing if hte goal is south of the current tile
+        if row + 1 == gridlength - 1 and column == gridlength - 1:
+            #print("Goal!")
+            return True
+        #Going through the grid
+        for scan in playgrid:
+            #Ensuring that it's the right spot - right position, occupied but not blocked
+            if scan.row == row + 1 and scan.column == column and scan.occupied and (not scan.blocked):
+                #Finding the tile on top of the grid
+                for nexttile in pygame.sprite.spritecollide(scan, tiles, False):
+                    #Finally, insuring that the tile we found connects back to the original tile
+                    if nexttile.ways[0] & 0b0001 != 0 and not (nexttile.visited):
+                        #print("Going to (" + str(row + 1) + ", " + str(column) + ")")
+                        return pathFinder(nexttile, row + 1, column)
+                        
+    #Can go south?
+    if tile.ways[0] & 0b0010 != 0 and column + 1 < gridlength:
+        #Testing if the goal is east of the current tile
+        if row == gridlength - 1 and column + 1 == gridlength - 1:
+            #print("Goal!")
+            return True
+        #Going through the grid
+        for scan in playgrid:
+            #Ensuring that it's the right spot - right position, occupied but not blocked
+            if scan.row == row and scan.column == column + 1 and scan.occupied and (not scan.blocked):
+                #Finding the tile on top of the grid
+                for nexttile in pygame.sprite.spritecollide(scan, tiles, False):
+                    #Finally, insuring that the tile we found connects back to the original tile
+                    if nexttile.ways[0] & 0b1000 != 0 and not (nexttile.visited):
+                        #print("Going to (" + str(row) + ", " + str(column + 1) + ")")
+                        return pathFinder(nexttile, row, column + 1)
     
+    #Can go north?
+    if tile.ways[0] & 0b1000 != 0 and column - 1 >= 0:
+        #Going through the grid
+        for scan in playgrid:
+            #Ensuring that it's the right spot - right position, occupied but not blocked
+            if scan.row == row and scan.column == column - 1 and scan.occupied and (not scan.blocked):
+                #Finding the tile on top of the grid
+                for nexttile in pygame.sprite.spritecollide(scan, tiles, False):
+                    #Finally, insuring that the tile we found connects back to the original tile
+                    if nexttile.ways[0] & 0b0010 != 0 and not (nexttile.visited):
+                        #print("Going to (" + str(row) + ", " + str(column - 1) + ")")
+                        return pathFinder(nexttile, row, column - 1)
+                        
+    #Can go west?
+    if tile.ways[0] & 0b0001 != 0 and row - 1 >= 0:
+        #Going through the grid
+        for scan in playgrid:
+            #Ensuring that it's the right spot - right position, occupied but not blocked
+            if scan.row == row - 1 and scan.column == column and scan.occupied and (not scan.blocked):
+                #Finding the tile on top of the grid
+                for nexttile in pygame.sprite.spritecollide(scan, tiles, False):
+                    #Finally, insuring that the tile we found connects back to the original tile
+                    if nexttile.ways[0] & 0b0100 != 0 and not (nexttile.visited):
+                        #print("Going to (" + str(row - 1) + ", " + str(column) + ")")
+                        return pathFinder(nexttile, row - 1, column)
+                        
+    return False
+
+
 
 #Creating our grid - This can be re-done in the loop later on if truely desired
 playgrid = pygame.sprite.Group()
-for row in range(5):
-    for column in range(5):
+for row in range(gridlength):
+    for column in range(gridlength):
         playgrid.add(Square(row, column))
 
 #Creating a group for the tiles, and some tiles (Placeholders for now)
 tiles = pygame.sprite.Group()
-first = Tile(415, 45)
-second = Tile(415, 110)
-third = Tile(415, 175)
-fourth = Tile(415, 240)
-tiles.add(first)
-tiles.add(second)
-tiles.add(third)
-tiles.add(fourth)
+for y in range(8):
+    tiles.add(Tile(390, 20 + (35 * y)))
+for z in range(8):
+    tiles.add(Tile(435, 20 + (35 * z)))
 
 #Global that determines the tile that's being dragged
 global selected
 selected = None
 
+global backing
+backing = BLUE
+
 #Game loop
 while True:
     #Drawing the generic play area
+
     DISPLAYSURF.fill(BLUE)
 
     pygame.draw.rect(DISPLAYSURF, GOLD, [380, 0, 380, 320])
@@ -147,11 +240,25 @@ while True:
             #Snap-to, based off the centers of the tiles
             if selected is not None:
                 for spot in playgrid:
-                    #Checking that the tile and the appropriate grid tile are on tpo of one another, and that the grid spot is not occupied by another tile or an obstacle
+                    #Checking that the tile and the appropriate grid tile are on top of one another, and that the grid spot is not occupied by another tile or an obstacle
                     if selected.rect.collidepoint(spot.rect.x + (GRIDWID / 2), spot.rect.y + (GRIDHEI / 2)) and (not spot.occupied) and (not spot.blocked):
                         selected.rect.x = spot.rect.x + 2
                         selected.rect.y = spot.rect.y + 2
                         spot.occupied = True
+                        spot.toptile = selected
+
+
+                    #When a piece is secured, there's a check to see whether or not a complete path is made
+                    #This is tested at both potential starting points: (0, 1) and (1, 0)
+                    if spot.row == 1 and spot.column == 0 and spot.occupied:
+                        completion = pathFinder(spot.toptile, 1, 0)
+                    elif spot.row == 0 and spot.column == 1 and spot.occupied:
+                        completion = pathFinder(spot.toptile, 0, 1)
+
+                    #Resetting the tiles visited after a sweep                        
+                    for visits in tiles:
+                        visits.visited = False
+
             #With the mouse button released, selected is freed up for future dragging
                 selected = None
                 
@@ -170,6 +277,7 @@ while True:
                         #Frees up the occupied tile that the block was on top of
                         if selected.rect.collidepoint(spot.rect.x + (GRIDWID / 2), spot.rect.y + (GRIDHEI / 2)):
                             spot.occupied = False
+                            spot.toptile = None
                     break
         else:
         #If selected was found earlier, we skip the process and just move the selected tile
@@ -186,5 +294,10 @@ while True:
 
     #Drawing the tiles (Important, as they need to be on top of the grid)
     tiles.draw(DISPLAYSURF)
+
+    if completion:
+        message = font.render("Path found!", True, WHITE)
+        DISPLAYSURF.blit(message, (30, 150))
+    
     pygame.display.update()
     clock.tick(FPS)
