@@ -32,6 +32,12 @@ held = False
 global completion
 completion = False
 
+global area
+area = 1
+
+global level
+level = 1
+
 DISPLAYSURF = pygame.display.set_mode((xdim, ydim))
 
 font = pygame.font.SysFont("Ariel", 20)
@@ -134,7 +140,7 @@ def pathFinder(tile, row, column):
 
     #Can go east?
     if tile.ways[0] & 0b0100 != 0 and row + 1 < gridlength:
-        #Testing if hte goal is south of the current tile
+        #Testing if the goal is south of the current tile
         if row + 1 == gridlength - 1 and column == gridlength - 1:
             #print("Goal!")
             return True
@@ -209,6 +215,8 @@ for y in range(8):
 for z in range(8):
     tiles.add(Tile(435, 20 + (35 * z)))
 
+mountaineer = pygame.transform.scale(pygame.image.load("mountaineer_6.png"), (180, 240)).convert_alpha()
+
 #Global that determines the tile that's being dragged
 global selected
 selected = None
@@ -250,14 +258,69 @@ while True:
 
                     #When a piece is secured, there's a check to see whether or not a complete path is made
                     #This is tested at both potential starting points: (0, 1) and (1, 0)
-                    if spot.row == 1 and spot.column == 0 and spot.occupied:
+                    if spot.row == 1 and spot.column == 0 and spot.occupied and spot.toptile.ways[0] & 0b0001 != 0:
                         completion = pathFinder(spot.toptile, 1, 0)
-                    elif spot.row == 0 and spot.column == 1 and spot.occupied:
+                    elif spot.row == 0 and spot.column == 1 and spot.occupied and spot.toptile.ways[0] & 0b1000 != 0:
                         completion = pathFinder(spot.toptile, 0, 1)
 
                     #Resetting the tiles visited after a sweep                        
                     for visits in tiles:
                         visits.visited = False
+
+                    #Reconfiguring the board in response to completing the level
+                    if completion:
+                        level = level + 1
+
+                        if level == 2:
+                            mountaineer = pygame.transform.scale(pygame.image.load("mountaineer_5.png"), (180, 240)).convert_alpha()
+                        elif level == 3:
+                            mountaineer = pygame.transform.scale(pygame.image.load("mountaineer_4.png"), (180, 240)).convert_alpha()
+                        elif level == 4:
+                            mountaineer = pygame.transform.scale(pygame.image.load("mountaineer_3.png"), (180, 240)).convert_alpha()
+                        elif level == 5:
+                            mountaineer = pygame.transform.scale(pygame.image.load("mountaineer_2.png"), (180, 240)).convert_alpha()
+                        elif level > 5:
+                            mountaineer = pygame.transform.scale(pygame.image.load("mountaineer_FINAL.png"), (180, 240)).convert_alpha()
+                            
+                        #message = font.render("Path found!", True, WHITE)
+                        #DISPLAYSURF.blit(message, (30, 150))
+                        tiles.empty()
+
+                        blocks = 0
+                        blocklimit = level / 2
+    
+                        #Reconfiguring the board tiles are placed on
+                        for spot in playgrid:
+                            spot.toptile = None
+    
+                            #Start tile
+                            if spot.row == 0 and spot.column == 0:
+                                spot.image = pygame.image.load("begin.jpg")
+                                spot.image = pygame.transform.scale(spot.image, (GRIDWID - 1, GRIDHEI - 1))
+                                spot.blocked = True
+                            #Goal tile
+                            elif spot.row == gridlength - 1 and spot.column == gridlength - 1:
+                                spot.image = pygame.image.load("end.jpg")
+                                spot.image = pygame.transform.scale(spot.image, (GRIDWID - 1, GRIDHEI - 1))
+                                spot.blocked = True
+                            #Placing blocks (Rest of play area, currently spawns 2 blocks
+                            elif randint(0, 10) >= 8 and blocks < blocklimit and ((spot.row != 0 and spot.column != 1) or (spot.row != 1 and spot.column != 0) or (spot.row != gridlength - 2 and spot.column != gridlength - 1) or (spot.row != gridlength - 1 and spot.column != gridlength - 2)):
+                                spot.image = pygame.image.load("rock.jpg")
+                                spot.image = pygame.transform.scale(spot.image, (GRIDWID - 1, GRIDHEI - 1))
+                                spot.blocked = True
+                                blocks = blocks + 1
+                            #Remaining spots for typical play
+                            else:
+                                spot.image = pygame.Surface([GRIDWID, GRIDHEI])
+                                spot.image.fill(BLUE)
+                                spot.occupied = False
+                                spot.blocked = False
+
+                        for y in range(8):
+                            tiles.add(Tile(390, 20 + (35 * y)))
+                        for z in range(8):
+                            tiles.add(Tile(435, 20 + (35 * z)))
+                        completion = False
 
             #With the mouse button released, selected is freed up for future dragging
                 selected = None
@@ -285,56 +348,16 @@ while True:
                 selected.rect.x = clickx - offset
                 selected.rect.y = clicky - offset
 
+    DISPLAYSURF.blit(mountaineer, (0, 40))
+
+    message = font.render("Stage " + str(area) + "-" + str(level), True, WHITE)
+    DISPLAYSURF.blit(message, (310, 10))
     #Drawing all of the grid stuff
     playgrid.draw(DISPLAYSURF)
 
     for row in range(5):
         for column in range(5): 
             pygame.draw.rect(DISPLAYSURF, WHITE, [140 + (GRIDWID * row), 70 + (GRIDHEI * column), GRIDWID, GRIDHEI], 2)
-
-    #Reconfiguring the board in response to completing the level
-    if completion:
-        #message = font.render("Path found!", True, WHITE)
-        #DISPLAYSURF.blit(message, (30, 150))
-        tiles.empty()
-
-        blocks = 0
-        blocklimit = 2
-
-        #Reconfiguring the board tiles are placed on
-        for spot in playgrid:
-            spot.toptile = None
-
-            #Start tile
-            if spot.row == 0 and spot.column == 0:
-                spot.image = pygame.image.load("begin.jpg")
-                spot.image = pygame.transform.scale(spot.image, (GRIDWID - 1, GRIDHEI - 1))
-                spot.blocked = True
-            #Goal tile
-            elif spot.row == gridlength - 1 and spot.column == gridlength - 1:
-                spot.image = pygame.image.load("end.jpg")
-                spot.image = pygame.transform.scale(spot.image, (GRIDWID - 1, GRIDHEI - 1))
-                spot.blocked = True
-            #Placing blocks (Rest of play area, currently spawns 2 blocks
-            elif randint(0, 10) >= 8 and blocks < blocklimit:
-                spot.image = pygame.image.load("rock.jpg")
-                spot.image = pygame.transform.scale(spot.image, (GRIDWID - 1, GRIDHEI - 1))
-                spot.blocked = True
-                blocks = blocks + 1
-            #Remaining spots for typical play
-            else:
-                spot.image = pygame.Surface([GRIDWID, GRIDHEI])
-                spot.image.fill(BLUE)
-                spot.occupied = False
-                spot.blocked = False
-    
-            
-
-        for y in range(8):
-            tiles.add(Tile(390, 20 + (35 * y)))
-        for z in range(8):
-            tiles.add(Tile(435, 20 + (35 * z)))
-        completion = False
 
     #Drawing the tiles (Important, as they need to be on top of the grid)
     tiles.draw(DISPLAYSURF)
